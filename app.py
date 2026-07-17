@@ -62,14 +62,24 @@ def money(x) -> str:
     return "—" if x is None else f"${x:,.2f}"
 
 
-def fmt_dt(dt: datetime) -> str:
-    if dt is None:
+def fmt_dt(dt) -> str:
+    # Handles None, pandas NaT, and both tz-aware and tz-naive timestamps.
+    if dt is None or pd.isna(dt):
         return "—"
-    return dt.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    try:
+        if dt.tzinfo is None:
+            # Assume UTC for naive values coming back from the DB driver.
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    except Exception:
+        return str(dt)
 
 
 def auction_open(batch: dict) -> bool:
-    return datetime.now(timezone.utc) < batch["end_time"]
+    end = batch["end_time"]
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) < end
 
 
 # --------------------------------------------------------------------------- #
