@@ -1,0 +1,12 @@
+command:
+  - "streamlit"
+  - "run"
+  - "app.py"
+
+env:
+  - name: LAKEBASE_INSTANCE_NAME
+    value: "auction-lakebase"
+  - name: ADMIN_EMAILS
+    value: "satya.sure@gmail.com"
+  - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+    value: "false"
