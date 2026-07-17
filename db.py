@@ -318,6 +318,62 @@ def get_items_with_highest(batch_id: int) -> list[dict]:
             return cur.fetchall()
 
 
+def get_batch_leaders(batch_id: int) -> list[dict]:
+    """ADMIN ONLY: each item in a batch with the highest bidder's identity.
+
+    Ties on amount are broken by earliest bid time (first to reach the amount).
+    Items with no bids are still returned, with null bidder fields.
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT i.item_number, i.item_name, i.starting_bid,
+                       top.amount      AS highest_bid,
+                       top.created_at  AS bid_time,
+                       bd.name         AS bidder_name,
+                       bd.email        AS bidder_email,
+                       bd.phone        AS bidder_phone,
+                       (SELECT COUNT(*) FROM auction.bids b2 WHERE b2.item_id = i.item_id) AS n_bids
+                FROM auction.items i
+                LEFT JOIN LATERAL (
+                    SELECT b.amount, b.created_at, b.bidder_id
+                    FROM auction.bids b
+                    WHERE b.item_id = i.item_id
+                    ORDER BY b.amount DESC, b.created_at ASC
+                    LIMIT 1
+                ) top ON TRUE
+                LEFT JOIN auction.bidders bd ON bd.bidder_id = top.bidder_id
+                WHERE i.batch_id = %s
+                ORDER BY i.item_number
+                """,
+                (batch_id,),
+            )
+            return cur.fetchall()
+
+
+def get_batch_all_bids(batch_id: int) -> list[dict]:
+    """ADMIN ONLY: full bid log for a batch with bidder identities."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT i.item_number, i.item_name, b.amount, b.created_at,
+                       bd.name AS bidder_name, bd.email AS bidder_email,
+                       bd.phone AS bidder_phone,
+                       (b.amount = (SELECT MAX(b2.amount) FROM auction.bids b2
+                                    WHERE b2.item_id = b.item_id)) AS is_leading
+                FROM auction.bids b
+                JOIN auction.items i ON i.item_id = b.item_id
+                JOIN auction.bidders bd ON bd.bidder_id = b.bidder_id
+                WHERE i.batch_id = %s
+                ORDER BY i.item_number, b.amount DESC, b.created_at ASC
+                """,
+                (batch_id,),
+            )
+            return cur.fetchall()
+
+
 def get_my_bids(batch_id: int, bidder_id: int) -> list[dict]:
     with get_conn() as conn:
         with conn.cursor() as cur:

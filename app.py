@@ -344,5 +344,68 @@ if is_admin:
                 hide_index=True,
                 use_container_width=True,
             )
+
+            st.divider()
+            st.subheader("🏆 Winners & bidder details")
+            st.caption(
+                "Organizer-only view — bidder identities are hidden from other "
+                "bidders but shown here so you can contact the highest bidder."
+            )
+            batch_opts = {
+                f"Batch #{b['batch_number']}"
+                + (" (active)" if b["is_active"] else "")
+                + f" — {b['label']}": b["batch_id"]
+                for b in batches
+            }
+            chosen = st.selectbox("Select a batch", list(batch_opts.keys()))
+            sel_batch_id = batch_opts[chosen]
+
+            leaders = db.get_batch_leaders(sel_batch_id)
+            if leaders:
+                ldf = pd.DataFrame(leaders)
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "#": ldf["item_number"],
+                            "Item": ldf["item_name"],
+                            "Starting": ldf["starting_bid"].map(money),
+                            "Highest bid": ldf["highest_bid"].map(money),
+                            "Highest bidder": ldf["bidder_name"].fillna("— no bids —"),
+                            "Email": ldf["bidder_email"].fillna(""),
+                            "Phone": ldf["bidder_phone"].fillna(""),
+                            "Bids": ldf["n_bids"],
+                            "Bid time": ldf["bid_time"].map(fmt_dt),
+                        }
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+                with st.expander("Full bid log (all bids, all bidders)"):
+                    all_bids = db.get_batch_all_bids(sel_batch_id)
+                    if all_bids:
+                        abdf = pd.DataFrame(all_bids)
+                        st.dataframe(
+                            pd.DataFrame(
+                                {
+                                    "#": abdf["item_number"],
+                                    "Item": abdf["item_name"],
+                                    "Amount": abdf["amount"].map(money),
+                                    "Leading?": abdf["is_leading"].map(
+                                        lambda x: "🥇" if x else ""
+                                    ),
+                                    "Bidder": abdf["bidder_name"],
+                                    "Email": abdf["bidder_email"],
+                                    "Phone": abdf["bidder_phone"],
+                                    "Placed": abdf["created_at"].map(fmt_dt),
+                                }
+                            ),
+                            hide_index=True,
+                            use_container_width=True,
+                        )
+                    else:
+                        st.info("No bids in this batch yet.")
+            else:
+                st.info("This batch has no items.")
         else:
             st.info("No batches yet.")
