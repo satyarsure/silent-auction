@@ -14,9 +14,13 @@ from __future__ import annotations
 import io
 import os
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+
+# All dates/times in the UI are shown and entered in US Eastern time.
+EASTERN = ZoneInfo("America/New_York")
 
 # When hosted OUTSIDE Databricks (e.g. Streamlit Community Cloud), the app is
 # not given Databricks credentials automatically. We surface them from Streamlit
@@ -70,7 +74,7 @@ def fmt_dt(dt) -> str:
         if dt.tzinfo is None:
             # Assume UTC for naive values coming back from the DB driver.
             dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        return dt.astimezone(EASTERN).strftime("%Y-%m-%d %I:%M %p %Z")
     except Exception:
         return str(dt)
 
@@ -278,10 +282,10 @@ if is_admin:
         )
 
         uploaded = st.file_uploader("Items Excel (.xlsx)", type=["xlsx"])
-        default_end = datetime.now() + timedelta(days=7)
+        default_end = datetime.now(EASTERN) + timedelta(days=7)
         ec1, ec2 = st.columns(2)
-        end_date = ec1.date_input("Auction end date", value=default_end.date())
-        end_time_v = ec2.time_input("Auction end time", value=default_end.time().replace(microsecond=0))
+        end_date = ec1.date_input("Auction end date (Eastern)", value=default_end.date())
+        end_time_v = ec2.time_input("Auction end time (Eastern)", value=default_end.time().replace(microsecond=0))
         label = st.text_input("Batch label (optional)")
 
         parsed = None
@@ -306,7 +310,7 @@ if is_admin:
         if parsed is not None and st.button(
             "🚀 Archive old batch & activate these items", type="primary"
         ):
-            end_dt = datetime.combine(end_date, end_time_v).astimezone()
+            end_dt = datetime.combine(end_date, end_time_v, tzinfo=EASTERN)
             items = list(
                 parsed.itertuples(index=False, name=None)
             )  # (item_number, item_name, starting_bid)
